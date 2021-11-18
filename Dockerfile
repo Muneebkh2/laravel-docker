@@ -1,0 +1,157 @@
+# FROM php:7.2-fpm-alpine
+
+# RUN docker-php-ext-install pdo pdo_mysql
+
+
+#
+#--------------------------------------------------------------------------
+# Image Setup
+#--------------------------------------------------------------------------
+#
+
+FROM php:7.1-fpm
+
+#
+#--------------------------------------------------------------------------
+# Software's Installation
+#--------------------------------------------------------------------------
+#
+# Installing tools and PHP extentions using "apt", "docker-php", "pecl",
+#
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    curl \
+    vim \
+    git \
+    curl \
+    python3.4 \
+    python3-pip \
+    libmemcached-dev \
+    libz-dev \
+    libpq-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libfreetype6-dev \
+    libssl-dev \
+    libmcrypt-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions
+
+RUN docker-php-ext-install mcrypt \
+  # Install the PHP pdo_mysql extention
+  && docker-php-ext-install pdo_mysql \
+  # Install the PHP pdo_pgsql extention
+  && docker-php-ext-install pdo_pgsql \
+  && docker-php-ext-install pcntl sockets bcmath mbstring opcache mysqli gettext \
+  # Install the PHP gd library
+  && docker-php-ext-configure gd \
+    --enable-gd-native-ttf \
+    --with-jpeg-dir=/usr/lib \
+    --with-freetype-dir=/usr/include/freetype2 && \
+    docker-php-ext-install gd
+
+
+#####################################
+# Human Language and Character Encoding Support:
+#####################################
+# RUN apt-get update -yqq && \
+#     apt-get install -y zlib1g-dev libicu-dev g++ && \
+#     docker-php-ext-configure intl && \
+#     docker-php-ext-install intl 
+
+#####################################
+# Mongo
+#####################################
+
+# RUN apt-get install libcurl4-openssl-dev pkg-config -y && \
+#   apt-get install pkg-config -y && \ 
+#   apt-get install openssl -y &&  \
+#   pecl install mongodb && \ 
+#   docker-php-ext-enable mongodb
+
+
+####################################
+# Composer
+####################################
+RUN curl -o /tmp/composer-setup.php https://getcomposer.org/installer \
+  && curl -o /tmp/composer-setup.sig https://composer.github.io/installer.sig \
+  # Make sure we're installing what we think we're installing!
+  && php -r "if (hash('SHA384', file_get_contents('/tmp/composer-setup.php')) !== trim(file_get_contents('/tmp/composer-setup.sig'))) { unlink('/tmp/composer-setup.php'); echo 'Invalid installer' . PHP_EOL; exit(1); }" \
+  && php /tmp/composer-setup.php --no-ansi --install-dir=/usr/local/bin --filename=composer --snapshot \
+  && rm -f /tmp/composer-setup.*
+
+
+## Source the bash
+RUN . ~/.bashrc
+#RUN composer global install
+
+
+#####################################
+# Image optimizers:
+#####################################
+#USER root
+#RUN apt-get update -yqq && \
+#    apt-get install -y --force-yes jpegoptim optipng pngquant gifsicle \
+
+
+#####################################
+# ImageMagick:
+#####################################
+USER root
+RUN apt-get update -y && \
+    apt-get install -y libmagickwand-dev imagemagick && \ 
+    pecl install imagick && \
+    docker-php-ext-enable imagick 
+
+
+
+#####################################
+# Exif:
+#####################################
+RUN docker-php-ext-install exif 
+
+#####################################
+# ZipArchive:
+#####################################
+RUN docker-php-ext-install zip 
+
+
+#####################################
+# PHP REDIS EXTENSION FOR PHP 7.0
+#####################################
+RUN printf "\n" | pecl install -o -f redis \
+    &&  rm -rf /tmp/pear \
+    &&  docker-php-ext-enable redis 
+
+#####################################
+# pgsql client
+#####################################
+#RUN apt-get update -yqq && \
+#    apt-get install -y postgresql-client
+
+#####################################
+# pgsql
+#####################################
+#RUN apt-get update -yqq && \
+#    docker-php-ext-install pgsql
+
+#####################################
+# Mysql stuff
+#####################################
+RUN apt-get update -yqq && \
+    apt-get install default-mysql-client -y
+
+
+# Install supervisor
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    supervisor \
+  && rm -rf /var/lib/apt/lists/*
+
+
+ENTRYPOINT ["/usr/bin/supervisord", "-n", "-c",  "/etc/supervisor/supervisord.conf"]
+
+WORKDIR /etc/supervisor/conf.d/
